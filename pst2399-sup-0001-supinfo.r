@@ -616,70 +616,70 @@ AUC.therapyA.vs.therapyB <- Tumor.AUC(dataset = TGI.dataset, treatments.numerato
 ## Calculates results for Cox-Proportional Hazards regression ('method' = "cox") or log-rank tests ('method' = "log-rank")
 ## If 'plotKM' = TRUE, Kaplan-Meier curves are plotted in colors (default) or in gray-shades (if grey.shades = "yes")
 
-TTE.analysis <- function(dataset, event, treatments.numerator, treatment.denominator, method, plotKM = FALSE, grey.shades = "no"){
-	dataset         <- subset(dataset, Group %in% c(treatments.numerator, treatment.denominator))
-	dataset$Day     <- as.numeric(dataset$Day)
-	day0            <- min(dataset$Day)
-	day0.tv         <- dataset[dataset$Day == day0, "TV"]
-	data.n          <- tapply(dataset$TV, dataset$Animal, length)
-	dataset$day0.TV <- rep(day0.tv, data.n)
-	dataset         <- dataset[!is.na(dataset$TV), ]
-	dataset$event   <- dataset$TV > event
-	
-	data.tte   <- list()
-	animal.ids <- unique(dataset$Animal)
-	for(i in animal.ids){
-		surv.time1 <- surv.time2 <- NA
-		data.tte1  <- dataset[dataset$Animal == i, ]
-		if(all(!data.tte1$event, na.rm = T)){
-			surv.time2 <- max(data.tte1[!is.na(data.tte1$TV), "Day"], na.rm = T) 
-			event.day  <- which(data.tte1$Day == surv.time2)
-		} else {
-			surv.time1 <- min(data.tte1[data.tte1$event, "Day"], na.rm = T)
-			event.day  <- which(data.tte1$Day == surv.time1) 
-		}
-		data.tte <- rbind(data.tte, cbind(data.tte1[event.day, ], surv.time = max(c(surv.time1,surv.time2), na.rm = T) - day0))
-	}
-  
-	data.tte$Group <- factor(data.tte$Group, levels = c(treatment.denominator, treatments.numerator))
+TTE.analysis <- function(dataset, event, treatments.numerator, treatment.denominator, method, plotKM = FALSE, grey.shades = "no") {
+    dataset <- subset(dataset, Group %in% c(treatments.numerator, treatment.denominator))
+    dataset$Day <- as.numeric(dataset$Day)
+    day0 <- min(dataset$Day)
+    day0.tv <- dataset[dataset$Day == day0, "TV"]
+    data.n <- tapply(dataset$TV, dataset$Animal, length)
+    dataset$day0.TV <- rep(day0.tv, data.n)
+    dataset <- dataset[!is.na(dataset$TV), ]
+    dataset$event <- dataset$TV > event
 
-	if(method == "cox"){
-		cox              <- survival::coxph(survival::Surv(surv.time,event) ~ Group, data = data.tte)
-		res              <- cbind(summary(cox)$coef, summary(cox)$conf.int[, 3:4, drop = F])
-		rownames(res)    <- gsub("Group", "", rownames(res))
-		colnames(res)[colnames(res) == "Pr(>|z|)"] <- "pvalue"
-		colnames(res)    <- gsub(".95", "HR", colnames(res))
-		colnames(res)[2] <- "HR"
-		res              <- data.frame(Contrast = paste(rownames(res), "vs.", cox$xlevels$Group[1]), res)
-		rownames(res)    <- NULL
-	}
+    data.tte <- list()
+    animal.ids <- unique(dataset$Animal)
+    for (i in animal.ids) {
+        surv.time1 <- surv.time2 <- NA
+        data.tte1 <- dataset[dataset$Animal == i, ]
+        if (all(!data.tte1$event, na.rm = T)) {
+            surv.time2 <- max(data.tte1[!is.na(data.tte1$TV), "Day"], na.rm = T)
+            event.day <- which(data.tte1$Day == surv.time2)
+        } else {
+            surv.time1 <- min(data.tte1[data.tte1$event, "Day"], na.rm = T)
+            event.day <- which(data.tte1$Day == surv.time1)
+        }
+        data.tte <- rbind(data.tte, cbind(data.tte1[event.day, ], surv.time = max(c(surv.time1, surv.time2), na.rm = T) - day0))
+    } 
 
-	if(method == "log-rank"){
-		res <- list()
-		for(j in 1:length(treatments.numerator)){
-			lr  <- survival::survdiff(survival::Surv(surv.time, event) ~ Group, data = data.tte, Group %in% c(treatments.numerator[j], treatment.denominator))
-			res <- rbind(res, data.frame(Contrast = paste(treatments.numerator[j], "vs.", treatment.denominator), chisq = lr$chisq, pvalue = 1 - pchisq(lr$chisq, 1)))
-		}
-	}
-	
-	if(plotKM){
-		surv.fit <- survival::survfit(survival::Surv(surv.time, event) ~ Group, data = data.tte)
-		grps     <- gsub("Group=", "", names(surv.fit$strata))
-		grps.col <- viridis::viridis(length(grps))
-		if(grey.shades == "yes") grps.col <- grDevices::gray.colors(n = length(grps))
-		plot(surv.fit, conf.int = FALSE, mark.time = TRUE, lwd = 2, ylab = " 1 - Pr(event)", xlab = "Days", main = "Kaplan-Meier curves", cex.lab = 1.3, font.lab = 2, cex.main = 2.5, font.main = 2, col = grps.col, xaxt = "n", yaxt = "n")
-		abline(v = unique(dataset$Day), col = "grey90", lty = 3, lwd = 0.7)
-		abline(h = c(0, 0.25, 0.5, 0.75, 1), col = "grey90", lty = 3, lwd = 0.7)
-		axis(1, at = unique(dataset$Day), label = unique(dataset$Day))
-		axis(2, at = c(0, 0.25, 0.5, 0.75, 1), label = c(0, 0.25, 0.5, 0.75, 1), las = 2)
-		legend("bottomleft", legend = grps, col = grps.col, bty = "n", lwd = 1, cex = 1.2)
-		lines(surv.fit, conf.int = FALSE, mark.time = TRUE, col = grps.col)
-	}
-	return(res)
+    data.tte$Group <- factor(data.tte$Group, levels = c(treatment.denominator, treatments.numerator))
+
+    if (method == "cox") {
+        cox <- survival::coxph(survival::Surv(surv.time, event) ~ Group, data = data.tte, ties = 'efron')
+        res <- cbind(summary(cox)$coef, summary(cox)$conf.int[, 3:4, drop = F])
+        rownames(res) <- gsub("Group", "", rownames(res))
+        colnames(res)[colnames(res) == "Pr(>|z|)"] <- "pvalue"
+        colnames(res) <- gsub(".95", "HR", colnames(res))
+        colnames(res)[2] <- "HR"
+        res <- data.frame(Contrast = paste(rownames(res), "vs.", cox$xlevels$Group[1]), res)
+        rownames(res) <- NULL
+    }
+
+    if (method == "log-rank") {
+        res <- list()
+        for (j in 1:length(treatments.numerator)) {
+            lr <- survival::survdiff(survival::Surv(surv.time, event) ~ Group, data = data.tte, Group %in% c(treatments.numerator[j], treatment.denominator))
+            res <- rbind(res, data.frame(Contrast = paste(treatments.numerator[j], "vs.", treatment.denominator), chisq = lr$chisq, pvalue = 1 - pchisq(lr$chisq, 1)))
+        }
+    }
+
+    if (plotKM) {
+        surv.fit <- survival::survfit(survival::Surv(surv.time, event) ~ Group, data = data.tte)
+        grps <- gsub("Group=", "", names(surv.fit$strata))
+        grps.col <- viridis::viridis(length(grps))
+        if (grey.shades == "yes") grps.col <- grDevices::gray.colors(n = length(grps))
+        plot(surv.fit, conf.int = FALSE, mark.time = TRUE, lwd = 2, ylab = " 1 - Pr(event)", xlab = "Days", main = "Kaplan-Meier curves", cex.lab = 1.3, font.lab = 2, cex.main = 2.5, font.main = 2, col = grps.col, xaxt = "n", yaxt = "n")
+        abline(v = unique(dataset$Day), col = "grey90", lty = 3, lwd = 0.7)
+        abline(h = c(0, 0.25, 0.5, 0.75, 1), col = "grey90", lty = 3, lwd = 0.7)
+        axis(1, at = unique(dataset$Day), label = unique(dataset$Day))
+        axis(2, at = c(0, 0.25, 0.5, 0.75, 1), label = c(0, 0.25, 0.5, 0.75, 1), las = 2)
+        legend("bottomleft", legend = grps, col = grps.col, bty = "n", lwd = 1, cex = 1.2)
+        lines(surv.fit, conf.int = FALSE, mark.time = TRUE, col = grps.col)
+    }
+    return(res)
 }
 
 tte.cox.therapies.A.and.B.vs.control <- TTE.analysis(TGI.dataset.3, event = 2000, treatments.numerator = c("Therapy_A", "Therapy_B"), treatment.denominator = "Control", method = "cox", plotKM = FALSE)
-tte.lr.therapies.A.and.B.vs.control  <- TTE.analysis(TGI.dataset.3, event = 2000, treatments.numerator = c("Therapy_A", "Therapy_B"), treatment.denominator = "Control", method = "log-rank", plotKM = TRUE)
+tte.lr.therapies.A.and.B.vs.control <- TTE.analysis(TGI.dataset.3, event = 2000, treatments.numerator = c("Therapy_A", "Therapy_B"), treatment.denominator = "Control", method = "log-rank", plotKM = TRUE)
 
 #########################################################################################################################################################################
 ## Box 12:
